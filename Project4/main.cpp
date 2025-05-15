@@ -68,26 +68,25 @@ public:
     }
 };
 
-// 현재 디렉터리부터 DFS 순회해서 Directory 객체 구성
-std::shared_ptr<Directory> buildDirectory(const fs::path& path) {
-    auto dir = std::make_shared<Directory>(path.filename().string());
-
-    for (const auto& entry : fs::directory_iterator(path)) {
-        if (entry.is_directory()) {
-            dir->add(buildDirectory(entry.path()));
-        } else if (entry.is_regular_file()) {
-            uintmax_t size = entry.file_size();
-            dir->add(std::make_shared<File>(entry.path().filename().string(), size));
-        }
-    }
-
-    return dir;
-}
-
 int main() {
     fs::path currentPath = fs::current_path();
-    auto root = buildDirectory(currentPath);
+    auto root = std::make_shared<Directory>(currentPath.filename().string());
 
+    std::function<void(const fs::path&, std::shared_ptr<Directory>)> traverse;
+    traverse = [&](const fs::path& path, std::shared_ptr<Directory> currentDir) {
+        for (const auto& entry : fs::directory_iterator(path)) {
+            if (entry.is_regular_file()) {
+                auto file = std::make_shared<File>(entry.path().filename().string(), entry.file_size());
+                currentDir->add(file);
+            } else if (entry.is_directory()) {
+                auto dir = std::make_shared<Directory>(entry.path().filename().string());
+                currentDir->add(dir);
+                traverse(entry.path(), dir); // 재귀
+            }
+        }
+    };
+
+    traverse(currentPath, root);
     root->display();
 
     return 0;
